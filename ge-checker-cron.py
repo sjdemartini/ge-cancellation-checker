@@ -8,9 +8,11 @@ import json
 import logging
 import smtplib
 import sys
+import time
 
 from datetime import datetime
 from os import path
+from os import system
 from subprocess import check_output
 
 
@@ -87,17 +89,17 @@ def main(settings):
         # Run the phantom JS script - output will be formatted like 'July 20, 2015'
         # script_output = check_output(['phantomjs', '%s/ge-cancellation-checker.phantom.js' % pwd]).strip()
         script_output = check_output(['phantomjs', '--ssl-protocol=any', '%s/ge-cancellation-checker.phantom.js' % pwd, '--config', settings.get('configfile')]).strip()
-        
+
         if script_output == 'None':
             logging.info('No appointments available.')
             return
 
         new_apt = datetime.strptime(script_output, '%B %d, %Y')
     except ValueError:
-        logging.critical("Couldn't convert output: {} from phantomJS script into a valid date. ".format(script_output))
+        logging.exception("Couldn't convert output: {} from phantomJS script into a valid date. ".format(script_output))
         return
     except OSError:
-        logging.critical("Something went wrong when trying to run ge-cancellation-checker.phantom.js. Is phantomjs is installed?")
+        logging.exception("Something went wrong when trying to run ge-cancellation-checker.phantom.js. Is phantomjs is installed?")
         return
 
     current_apt = datetime.strptime(settings['current_interview_date_str'], '%B %d, %Y')
@@ -113,6 +115,8 @@ def main(settings):
             notify_send_email(settings, current_apt, new_apt, use_gmail=settings.get('use_gmail'))
         if settings.get('twilio_account_sid'):
             notify_sms(settings, new_apt)
+
+        system('say found Global Entry Appointment!')
 
 
 def _check_settings(config):
@@ -163,7 +167,7 @@ if __name__ == '__main__':
             for key, val in arguments.iteritems():
                 if not arguments.get(key): continue
                 settings[key] = val
-            
+
             settings['configfile'] = arguments['configfile']
             _check_settings(settings)
     except Exception as e:
@@ -179,4 +183,6 @@ if __name__ == '__main__':
 
     logging.debug('Running GE cron with arguments: %s' % arguments)
 
-    main(settings)
+    while True:
+        main(settings)
+        time.sleep(10)
